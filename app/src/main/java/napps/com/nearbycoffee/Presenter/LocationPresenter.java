@@ -8,9 +8,6 @@ import napps.com.nearbycoffee.Contract.LocationContract;
 
 public class LocationPresenter implements LocationContract.Presenter {
 
-    private final LocationContract.View mLocationView;
-    private final
-
     @Override
     public void start() {
 

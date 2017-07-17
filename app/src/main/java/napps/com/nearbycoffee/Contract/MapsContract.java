@@ -36,6 +36,5 @@ public interface MapsContract {
 
         void updateLocationonMaps();
 
-
     }
 }
