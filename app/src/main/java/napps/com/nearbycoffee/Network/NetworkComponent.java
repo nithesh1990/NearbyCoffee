@@ -52,4 +52,20 @@ public interface NetworkComponent {
     //Then we needed @Component(modules = {NetworkModule.class, AppModule.class}) because getBaseApplication is obtained from AppModule
     //Since we are not doing that we don't need that
 
+    //What modules to include is explained below
+    //    @Singleton
+    //    @Component(modules={AppModule.class, NetModule.class})
+    //    public interface NetComponent {
+    //        void inject(MainActivity activity);
+    //        // void inject(MyFragment fragment);
+    //        // void inject(MyService service);
+    //    }
+    //  This is a component which is instantiated in MainActivity. After instantiating we use two fields using @Inject
+    //    @Inject MyTwitterApiClient mTwitterApiClient;
+    //    @Inject SharedPreferences sharedPreferences;
+    //  Now MyTwitterApiClient is available in Netmodule.class which is connected to Netcomponent so it's fine.
+    //  SharedPreferences is the reason why we included Appmodule.class in component because it is present in AppModule.
+    //  So the methods inside a component are optional. We have to include the modules related to all the @Inject fields in modules list.
+
+
 }
