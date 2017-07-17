@@ -10,6 +10,7 @@ import javax.inject.Singleton;
 
 import dagger.Module;
 import dagger.Provides;
+import napps.com.nearbycoffee.BaseApplication;
 import okhttp3.Cache;
 import okhttp3.OkHttpClient;
 import retrofit2.Retrofit;
@@ -102,9 +103,9 @@ public class NetworkModule {
 
     @Provides
     @Singleton
-    Cache providesOkHttpCache(Application application) {
+    Cache providesOkHttpCache(BaseApplication baseApplication) {
         int cacheSize = 5 * 1024 * 1024; //5 mb
-        Cache cache = new Cache(application.getCacheDir(), cacheSize);
+        Cache cache = new Cache(baseApplication.getCacheDir(), cacheSize);
         return cache;
 
     }
