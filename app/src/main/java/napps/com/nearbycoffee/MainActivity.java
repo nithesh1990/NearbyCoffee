@@ -18,9 +18,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private GoogleMap mMap;
 
 
-    @Inject
-    FusedLocationProviderClient fusedLocationProviderClient;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

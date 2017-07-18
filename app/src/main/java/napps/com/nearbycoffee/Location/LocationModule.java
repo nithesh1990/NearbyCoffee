@@ -17,6 +17,7 @@ import javax.inject.Singleton;
 
 import dagger.Module;
 import dagger.Provides;
+import napps.com.nearbycoffee.BaseApplication;
 import napps.com.nearbycoffee.Utils.Constants;
 
 /**
@@ -84,13 +85,13 @@ public class LocationModule {
 
     @Provides
     @Singleton
-    FusedLocationProviderClient providesFusedLocationClient(Application application){
-        return LocationServices.getFusedLocationProviderClient(application);
+    FusedLocationProviderClient providesFusedLocationClient(BaseApplication baseApplication){
+        return LocationServices.getFusedLocationProviderClient(baseApplication);
     }
 
     @Provides
     @Singleton
-    SettingsClient providesSettingsClient(Application application){
-        return LocationServices.getSettingsClient(application);
+    SettingsClient providesSettingsClient(BaseApplication baseApplication){
+        return LocationServices.getSettingsClient(baseApplication);
     }
 }
