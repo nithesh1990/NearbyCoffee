@@ -199,6 +199,133 @@ public class LocationApiInjectorTest {
            onView(withId(R.id.textView)).check(matches(withText("Hello, World!")));
         }
     }
+
+    Consider the below class.
+
+        @RunWith(MockitoJUnitRunner.class)
+    public class LocationApiInjectorTest {
+
+    @Mock
+    Context context;
+
+    @Before
+    public void setUp() throws Exception {
+        //context = InstrumentationRegistry.getTargetContext();
+        //Assert.assertNotNull(context);
+        context = Mockito.mock(Context.class);
+        //Mockito.verify(context).getApplicationContext();
+    }
+
+    @Test
+    public void providesLocationRequest() throws Exception {
+        LocationRequest locationRequest = LocationApiInjector.providesLocationRequest();
+        Assert.assertNotNull(locationRequest);
+        Assert.assertEquals(LocationRequest.PRIORITY_HIGH_ACCURACY, locationRequest.getPriority());
+        Assert.assertEquals(Constants.LOCATION_UPDATE_INTERVAL_MS, locationRequest.getInterval());
+        Assert.assertEquals(Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS, locationRequest.getFastestInterval());
+        Assert.assertEquals(Constants.LOCATION_UPDATE_DISPLACEMENT_METERS, locationRequest.getSmallestDisplacement(), 10);
+    }
+
+    @Test
+    public void providesCustomLocationRequest() throws Exception {
+
+        LocationRequest locationRequest = LocationApiInjector.providesCustomLocationRequest(LocationRequest.PRIORITY_HIGH_ACCURACY,
+                Constants.LOCATION_UPDATE_INTERVAL_MS,
+                Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS,
+                Constants.LOCATION_UPDATE_DISPLACEMENT_METERS);
+        Assert.assertNotNull(locationRequest);
+        Assert.assertEquals(LocationRequest.PRIORITY_HIGH_ACCURACY, locationRequest.getPriority());
+        Assert.assertEquals(Constants.LOCATION_UPDATE_INTERVAL_MS, locationRequest.getInterval());
+        Assert.assertEquals(Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS, locationRequest.getFastestInterval());
+        Assert.assertEquals(Constants.LOCATION_UPDATE_DISPLACEMENT_METERS, locationRequest.getSmallestDisplacement(), 10);
+
+    }
+
+    @Test
+    public void providesLocationSettingsRequest() throws Exception {
+        LocationSettingsRequest locationSettingsRequest = LocationApiInjector.providesLocationSettingsRequest();
+        Assert.assertNotNull(locationSettingsRequest);
+    }
+
+    @Test
+    public void provideCustomLocationSettingsRequest() throws Exception {
+        LocationSettingsRequest locationSettingsRequest = LocationApiInjector.provideCustomLocationSettingsRequest(LocationApiInjector.providesLocationRequest());
+        Assert.assertNotNull(locationSettingsRequest);
+    }
+
+    @Test
+    public void providesFusedLocationClient() throws Exception {
+        FusedLocationProviderClient fusedLocationProviderClient = LocationApiInjector.providesFusedLocationClient(context);
+        Assert.assertNotNull(fusedLocationProviderClient);
+     }
+
+    @Test
+    public void providesSettingsClient() throws Exception {
+        SettingsClient settingsClient = LocationApiInjector.providesSettingsClient(context);
+        Assert.assertNotNull(settingsClient);
+    }
+
+    }
+
+    In this class whenever we ran this as an android unit test on local jvm, 4 test cases passed but 2 failed always.
+    4 passed because : They did not have any dependency on android classes.
+    2 failed because : They did have android context dependency. So we mocked the context object but they still failed throwing this exception.
+                        This means they had deep dependencies on android. These methods not just required context but something else.
+    java.lang.RuntimeException: Method myLooper in android.os.Looper not mocked. See http://g.co/androidstudio/not-mocked for details.
+
+	at android.os.Looper.myLooper(Looper.java)
+	at com.google.android.gms.common.api.zzd.zzpj(Unknown Source)
+	at com.google.android.gms.common.api.GoogleApi.<init>(Unknown Source)
+	at com.google.android.gms.location.FusedLocationProviderClient.<init>(Unknown Source)
+	at com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(Unknown Source)
+	at com.napps.nearbycoffee.Injectors.LocationApiInjector.providesFusedLocationClient(LocationApiInjector.java:62)
+	at com.napps.nearbycoffee.LocationApiInjectorTest.providesFusedLocationClient(LocationApiInjectorTest.java:76)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.mockito.internal.runners.DefaultInternalRunner$1.run(DefaultInternalRunner.java:78)
+	at org.mockito.internal.runners.DefaultInternalRunner.run(DefaultInternalRunner.java:84)
+	at org.mockito.internal.runners.StrictRunner.run(StrictRunner.java:39)
+	at org.mockito.junit.MockitoJUnitRunner.run(MockitoJUnitRunner.java:161)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:117)
+	at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:42)
+	at com.intellij.rt.execution.junit.JUnitStarter.prepareStreamsAndStart(JUnitStarter.java:262)
+	at com.intellij.rt.execution.junit.JUnitStarter.main(JUnitStarter.java:84)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at com.intellij.rt.execution.application.AppMain.main(AppMain.java:147)
+
+
+    From the above example, we get to know that class is not designed properly. There is improper mix of methods which have different dependency requirements.
+    We designed the class so that all location related stuff should be in one class which was a poor and bad design. There is no technical
+    evidence for that kind of thinking. So a good design is not putting all the conceptually related stuff together but technically related stuff together.
+    As we see from the methods the two methods don't even need the other methods to function and are not even dependent on them. But the other 4 methods are kind
+    of dependent on each other. A good design would be separating the two methods and keeping them separately in other file and moving that file to the androidTest
+    file so that when run it runs on real device and gets the required behaviour.
+
+    One more thing is testing the methods that involve third party APIs or while testing third party APIs and if they require any android dependencies, it is always
+    good to treat them as instrumentation tests requiring hard android dependencies. It is because, we never know what these apis might internally request from the passed
+    in android object. If we pass in a context, the apis might internally call many methods of context to do something. Since we don't know we can't use mockito's when-return
+    to mock all those methods. It's totally not possible. So it is always best to pass in a real object and see how the apis behave. So we have to aggregate those kinds of methods
+    into a common place which makes a good testable and maintainable architecture.
     */
 
     @Mock
