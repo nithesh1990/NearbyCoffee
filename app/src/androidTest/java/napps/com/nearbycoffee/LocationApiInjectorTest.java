@@ -162,6 +162,43 @@ public class LocationApiInjectorTest {
             assertThat(result, is(FAKE_STRING));
         }
     }
+
+
+    @Rule: Rules allow you to flexibly add or redefine the behavior of each test method in a reusable way. In Android testing, use this annotation together with one of the test rule classes that the Android Testing Support Library provides, such as ActivityTestRule or ServiceTestRule.
+    Rules are basically a way of executing the test cases. Let's suppose you don't want to execute all the test methods at once. You want it to do it one after the other or in some particular sequence.
+    For example whenever testing an activity class you want ot execute Oncreate->Onstart->OnResume in sequence one after the other. Test Rule comes useful in that scenario.
+
+    Similarly there are different code sections possible in any android application.
+
+    @Before: Use this annotation to specify a block of code that contains test setup operations. The test class invokes this code block before each test. You can have multiple @Before methods but the order in which the test class calls these methods is not guaranteed.
+    @After: This annotation specifies a block of code that contains test tear-down operations. The test class calls this code block after every test method. You can define multiple @After operations in your test code. Use this annotation to release any resources from memory.
+    @Test: Use this annotation to mark a test method. A single test class can contain multiple test methods, each prefixed with this annotation.
+    @Rule: Rules allow you to flexibly add or redefine the behavior of each test method in a reusable way. In Android testing, use this annotation together with one of the test rule classes that the Android Testing Support Library provides, such as ActivityTestRule or ServiceTestRule.
+    @BeforeClass: Use this annotation to specify static methods for each test class to invoke only once. This testing step is useful for expensive operations such as connecting to a database.
+    @AfterClass: Use this annotation to specify static methods for the test class to invoke only after all tests in the class have run. This testing step is useful for releasing any resources allocated in the @BeforeClass block.
+    @Test(timeout=): Some annotations support the ability to pass in elements for which you can set values. For example, you can specify a timeout period for the test. If the test starts but does not complete within the given timeout period, it automatically fails. You must specify the timeout period in milliseconds, for example: @Test(timeout=5000).
+
+
+
+    A basic JUnit 4 test class is a Java class that contains one or more test methods. A test method begins with the @Test annotation and contains the code to exercise and verify a single functionality (that is, a logical unit) in the component that you want to test.
+
+    The following snippet shows an example JUnit 4 integration test that uses the Espresso APIs to perform a click action on a UI element, then checks to see if an expected string is displayed.
+
+    @RunWith(AndroidJUnit4.class)
+    @LargeTest
+    public class MainActivityInstrumentationTest {
+
+        @Rule
+        public ActivityTestRule mActivityRule = new ActivityTestRule<>(
+                MainActivity.class);
+
+        @Test
+        public void sayHello(){
+            onView(withText("Say hello!")).perform(click());
+
+           onView(withId(R.id.textView)).check(matches(withText("Hello, World!")));
+        }
+    }
     */
 
     @Mock
