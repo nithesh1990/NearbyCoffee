@@ -184,10 +184,41 @@ public interface PlacesAPIInterface {
                     Next we will cover "Where?" part. Where are these things done? Where is the work done? where are the results received? etc. RxJava is known for asynchronous programming.
                     So we can assume most of the things happen in background thread. But to that exception all the above things can happen on a single thread/calling thread/main UI thread in android.
                     But we don't want that to happen. If that happens then there is no use of learning RxJava in first place. So we deliberately want this to happen on other threads/background threads.
-                    Before moving into that, there are two main things that happen in RxJava - Computation/Data Emission and Obsorption. RxJa
+                    Before moving into that, there are two main things that happen in RxJava - Computation/Data Emission and Obsorption. Luckily RxJava allows to emit data in one place and listen in another placee.
+                    It takes care of moving the stuff between places i.e threads basically. For that we have two methods
+
+                    SubscribeOn(Thread t) - To tell RxJava to perform computation/data emission on thread t
+                    ObserveOn(Thread s) - To tell RxJava to receive the data stream on thread s
+
+                    If we don't specify this, then everything happens on the calling thread. So we have to make sure we call these methods properly
+
+                    Moving back to where things happen, it happens on threads. We have to specify what happens on which thread. Where do these threads come from?
+                    Schedulers are the ones who can create threads for us to use those for Observables and observers.
+
+                    Actually SubscribeOn and ObserveOn takes in Schedulers as the parameters. So it's SubscribeOn(Scheduler S) and ObserveOn(Scheduler S).
+
+                    There are different kinds of Schedulers available in RxJava. Below are the list of those schedulers
+
+                            1. Schedulers.io(): Designed to be used for IO-related tasks.
+                            2. Schedulers.computation(): Designed to be used for computational tasks. By default, the number of threads in the computation scheduler is limited to the number of CPUs available on your device.
+                            3. Schedulers.newThread(): Creates a new thread.
+                            4. AndroidSchedulers.mainThread() : Specific for Android which observes data on UI thread
 
 
+       Problems with RxJava
 
+        By default, RxJava operates a push-based workflow: data is produced upstream by an Observable, and is then pushed downstream to the assigned Observer. The major issue with a push-based workflow is how easy it is for the producer (in this instance, the Observable) to emit items too quickly for the consumer (Observer) to process.
+        A chatty Observable and a slow Observer can quickly result in a backlog of unconsumed items, which is going to gobble up system resources and may even result in an OutOfMemoryException. This problem is known as backpressure.
+        If you suspect that backpressure is occurring in your app, then there are a few possible solutions, including using an operator to reduce the number of items being produced.
+
+        Some solutions
+        1. Creating Sampling Periods With sample() and throttlefirst()
+        2. Batching Emissions With buffer()
+        3. Replacing Observables With Flowables
+        4. Singles
+
+        Memory Leaks
+        memory leaks caused by incomplete subscriptions are the biggest drawback to using RxJava in your Android apps
 
      */
     @GET("nearbysearch/{responseFormat}")

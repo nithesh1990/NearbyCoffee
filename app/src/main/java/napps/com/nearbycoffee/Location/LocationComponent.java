@@ -11,4 +11,7 @@ import napps.com.nearbycoffee.AppModule;
 @Singleton
 @Component(modules = {LocationModule.class, AppModule.class})
 public interface LocationComponent {
+
+    void inject(GetLocationUseCase getLocationUseCase);
+
 }

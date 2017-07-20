@@ -6,4 +6,5 @@ package napps.com.nearbycoffee;
 
 public interface BasePresenter {
     void start();
+    void stop();
 }
