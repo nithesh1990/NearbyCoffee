@@ -326,6 +326,200 @@ public class LocationApiInjectorTest {
     in android object. If we pass in a context, the apis might internally call many methods of context to do something. Since we don't know we can't use mockito's when-return
     to mock all those methods. It's totally not possible. So it is always best to pass in a real object and see how the apis behave. So we have to aggregate those kinds of methods
     into a common place which makes a good testable and maintainable architecture.
+
+
+    Actual Working example of Mockito in Android
+    @RunWith(MockitoJUnitRunner.class)
+    public class AppUtilsTest {
+
+    @Mock
+    Context context;
+    @Mock
+    ConnectivityManager connectivityManager;
+
+    @Mock
+    NetworkInfo networkInfo;
+
+    @Before
+    public void setUp() throws Exception {
+
+    }
+
+    @Test
+    public void checkNetworkConnection() throws Exception {
+        Mockito.when(context.getSystemService(Context.CONNECTIVITY_SERVICE)).thenReturn(connectivityManager);
+        Mockito.when(connectivityManager.getActiveNetworkInfo()).thenReturn(networkInfo);
+        Mockito.when(networkInfo.isConnectedOrConnecting()).thenReturn(false);
+        boolean expected = false;
+        boolean actual = AppUtils.checkNetworkConnection(context);
+        Assert.assertEquals(expected, actual);
+     }
+
+    It does object mocking correctly and runs the test successfully.
+
+    If we replace the following line
+    Mockito.when(connectivityManager.getActiveNetworkInfo()).thenReturn(networkInfo);
+
+    with this
+    Mockito.when(connectivityManager.getActiveNetworkInfo()).thenReturn(null);
+
+    We are gettting the following error
+    org.mockito.exceptions.misusing.UnnecessaryStubbingException:
+    Unnecessary stubbings detected in test class: AppUtilsTest
+    Clean & maintainable test code requires zero unnecessary code.
+    Following stubbings are unnecessary (click to navigate to relevant line of code):
+      1. -> at com.napps.nearbycoffee.Utils.AppUtilsTest.checkNetworkConnection(AppUtilsTest.java:38)
+    Please remove unnecessary stubbings or use 'silent' option. More info: javadoc for UnnecessaryStubbingException class.
+
+        at org.mockito.internal.runners.StrictRunner.run(StrictRunner.java:49)
+        at org.mockito.junit.MockitoJUnitRunner.run(MockitoJUnitRunner.java:161)
+        at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+        at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:117)
+        at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:42)
+        at com.intellij.rt.execution.junit.JUnitStarter.prepareStreamsAndStart(JUnitStarter.java:262)
+        at com.intellij.rt.execution.junit.JUnitStarter.main(JUnitStarter.java:84)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at com.intellij.rt.execution.application.AppMain.main(AppMain.java:147)
+
+
+    It says that some methods are not used. Let's read an example from the documentation
+
+
+    Unnecessary stubs are stubbed method calls that were never realized during test execution (see also MockitoHint), example:
+
+     //code under test:
+     ...
+     String result = translator.translate("one")
+     ...
+
+     //test:
+     ...
+     when(translator.translate("one")).thenReturn("jeden"); // <- stubbing realized during code execution
+     when(translator.translate("two")).thenReturn("dwa"); // <- stubbing never realized
+     ...
+
+    Notice that one of the stubbed methods were never realized in the code under test, during test execution. The stray stubbing might be an oversight of the developer, the artifact of copy-paste or the effect not understanding the test/code. Either way, the developer ends up with unnecessary test code. In order to keep the codebase clean & maintainable it is necessary to remove unnecessary code. Otherwise tests are harder to read and reason about.
+    To find out more about detecting unused stubbings see MockitoHint.
+
+
+    We don't have any duplicate methods but still why did we get the error. Let's analyze the code part
+
+        #Test Code
+        Mockito.when(connectivityManager.getActiveNetworkInfo()).thenReturn(null);
+        Mockito.when(networkInfo.isConnectedOrConnecting()).thenReturn(false);
+
+        #Actual Code
+        return activeNetwork != null &&
+                activeNetwork.isConnectedOrConnecting();
+
+        In the actual code whenever activeNetwork == null, it immediately returns false and will not check the next part as it is AND operation.
+        Since the next part is not check the test rule corresponding the next part
+
+        Mockito.when(networkInfo.isConnectedOrConnecting()).thenReturn(false);
+
+        is also not run.
+
+       We tried to test the below code
+
+      public static boolean getLocationPermissionsStatus(@NonNull Context context){
+        return ContextCompat.checkSelfPermission(context,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+       }
+
+       This actually calls ContextCompat.checkSelfPermission(..). Since there is only one dependency, we thought we will mock ContextCompat and the method like below
+
+       Mockito.when(contextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)).thenReturn(PackageManager.PERMISSION_GRANTED);
+
+       and we tried executing the test but got the following error.
+
+        java.lang.RuntimeException: Method myPid in android.os.Process not mocked. See http://g.co/androidstudio/not-mocked for details.
+
+        at android.os.Process.myPid(Process.java)
+        at android.support.v4.content.ContextCompat.checkSelfPermission(ContextCompat.java:453)
+        at com.napps.nearbycoffee.Utils.AppUtilsTest.getLocationPermissionsStatus(AppUtilsTest.java:46)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+        at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+        at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+        at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+        at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+        at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+        at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+        at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+        at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+        at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+        at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+        at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+        at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+        at org.mockito.internal.runners.DefaultInternalRunner$1.run(DefaultInternalRunner.java:78)
+        at org.mockito.internal.runners.DefaultInternalRunner.run(DefaultInternalRunner.java:84)
+        at org.mockito.internal.runners.StrictRunner.run(StrictRunner.java:39)
+        at org.mockito.junit.MockitoJUnitRunner.run(MockitoJUnitRunner.java:161)
+        at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+        at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:117)
+        at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:42)
+        at com.intellij.rt.execution.junit.JUnitStarter.prepareStreamsAndStart(JUnitStarter.java:262)
+        at com.intellij.rt.execution.junit.JUnitStarter.main(JUnitStarter.java:84)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at com.intellij.rt.execution.application.AppMain.main(AppMain.java:147)
+
+
+        The following error is because internally in ContextCompat.checkselfPermission(..) it uses
+
+        public static int checkSelfPermission(@NonNull Context context, @NonNull String permission) {
+            if (permission == null) {
+                throw new IllegalArgumentException("permission is null");
+            }
+
+            return context.checkPermission(permission, android.os.Process.myPid(), Process.myUid());
+        }
+
+        But we have to observe one more thing here. We mocked the whole method so it should return what we say. Is it?
+        because the same thing we did for the previous method. Here we have to observe the core thing which makes us understand better
+        how mocking actually happens.
+
+        Consider the method
+
+        public static boolean checkNetworkConnection(@NonNull Context context){
+        ConnectivityManager cm =
+                (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        ........
+        ........
+
+        This method uses that mock object that we provided and subsequently we create the chaining methods and it works fine.
+
+        But in this method
+
+        public static int checkSelfPermission(@NonNull Context context, @NonNull String permission) {
+            if (permission == null) {
+                throw new IllegalArgumentException("permission is null");
+            }
+
+            return context.checkPermission(permission, android.os.Process.myPid(), Process.myUid());
+        }
+
+        even though we mock context compat object
+
+        @Mock
+        ContextCompat contextCompat;
+
+        it is not using our mock object because checkSelfPermission is a static method which does not require any contextcompat object
+        morever we are not even passing the mocked object inside the method. How will it know about contextcompat object.
+
+        So mockito is not suitable for testing public static methods and deep android calls. So we have to move this under androidTest
+
+
+
     */
 
     @Mock
