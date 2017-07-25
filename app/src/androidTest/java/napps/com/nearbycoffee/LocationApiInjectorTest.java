@@ -518,66 +518,371 @@ public class LocationApiInjectorTest {
 
         So mockito is not suitable for testing public static methods and deep android calls. So we have to move this under androidTest
 
+        Similarly use mockito only if you have method calls that are only 1 or 2 levels deep and it uses
+        objects/classes that you have created so that you can mock any method if required.
+        Don't use if there is deep nested call inside any method or the method uses any framework or platform specific calls.
+
+        Limitations in Mockito
+
+            1.Final classes
+            2. Anonymous classes
+            3. Primitive types
+            I want to show you how we can test Android things.
+
+            @Test
+            public void shouldBeCreatedIntent() {
+                 Context context = Mockito.mock(Context.class);
+                 Intent intent = MainActivity.createQuery(context, "query", "value");
+                 assertNotNull(intent);
+                 Bundle extras = intent.getExtras();
+                 assertNotNull(extras);
+                 assertEquals("query", extras.getString("QUERY"));
+                 assertEquals("value", extras.getString("VALUE"));
+            }
+            Unfortunately if we run this test, we get next error log.
+
+            java.lang.RuntimeException: Method putExtra in android.content.Intent not mocked. See http://g.co/androidstudio/not-mocked for details.
+             at android.content.Intent.putExtra(Intent.java)
+             at PaymentActivity.createIntent(PaymentActivity.java:15)
+             at MainActivityTest.shouldBeCreatedIntent(MainActivityTest.java:118)
+
+        So Although mockito is good, you cannot really unit test android apps because most of the classes in any android application will have
+        strong dependencies of android framework. Fortunately there is another library to the rescue of android unit testing : ROBOELECTRIC.
+
+        By performing most of the tests as Unit tests, concentrating much on tests, changing the implementation/architecture based on test results
+        is called Test Driven Development(TDD).
+
+        Robolectric
+
+            Unit testing has been particularly difficult in Android, although with Robolectric it is much easier.
+            This library also allows you to mock the Android SDK by removing the stubs that throw RuntimeExceptions.
+            Roboelectric is a unit testing library that allows you to run  your test in a Java Virtual Machine (JVM). This library also allow you to do Test Driven Development (TDD).
+            Roboelectric replaced all Android classes by so-called shadow objects.
+            If a method is implemented by Robolectric, it forwards these method calls to the shadow object which act similar to the objects of the Android SDK. If a method is not implemented by the shadow object, it simply returns a default value, e.g., null or 0.
+
+        Before proceeding to the configuration, let's create a separate folder for RoboElectric Tests. This can do android unit testing which does not depend on pure android behaviour.
+
+        For this we had to create a folder in android application. It is better to create folder in project View/project perspective
+
+        *project view image*
+
+        When we opened that folder we found two additional folders - debug and release. We opened that folder curiously to see what's inside.
+
+        Debug folder contained
+                    <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">AIzaSyBOx732ytnR0tWQggzQprzCEu50c_vJeCM</string>
+
+        Release folder contained
+            release/res/values/google_maps_api.xml which had
+                    <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">YOUR_KEY_HERE</string>
+
+        Here we can see that only debug folder contained that key but not release folder. While releasing we have to make sure all these things are correct.
+
+        We can actually create custom xml files and put in this folder which will be helpful in development and release like API Keys etc.
+
+        Coming back to RoboElectric
+
+        Running tests on an Android emulator or device is slow! Building, deploying, and launching the app often takes a minute or more. That’s no way to do TDD. There must be a better way.
+
+        Robolectric is a unit test framework that de-fangs the Android SDK jar so you can test-drive the development of your Android app. Tests run inside the JVM on your workstation in seconds.
+
+        SDK, Resources, & Native Method Emulation
+        Robolectric handles inflation of views, resource loading, and lots of other stuff that’s implemented in native C code on Android devices. This allows tests to do most things you could do on a real device. It’s easy to provide our own implementation for specific SDK methods too, so you could simulate error conditions or real-world sensor behavior, for example.
+
+        Run Tests Outside of the Emulator
+        Robolectric lets you run your tests on your workstation, or on your Continuous Integration environment in a regular JVM, without an emulator. Because of this, the dexing, packaging, and installing-on-the emulator steps aren’t necessary, reducing test cycles from minutes to seconds so you can iterate quickly and refactor your code with confidence.
+
+        No Mocking Frameworks Required
+        An alternate approach to Robolectric is to use mock frameworks such as Mockito or to mock out the Android SDK. While this is a valid approach, it often yields tests that are essentially reverse implementations of the application code.
+
+        Robolectric allows a test style that is closer to black box testing, making the tests more effective for refactoring and allowing the tests to focus on the behavior of the application instead of the implementation of Android. You can still use a mocking framework along with Robolectric if you like.
+            So before adding roboelectric dependency let's see what is the difference between testcompile and androidTestCompile?
+            Simply testCompile is the configuration for unit tests (those located in src/test) and androidTestCompile is used for the test api (that located in src/androidTest). Since you are intending to write unit tests, you should use testCompile.
+            Update: The main distinction between the two is the test sourceset runs in a regular Java JVM, whereas the androidTest sourceset tests run on an Android device (or an emulator).
 
 
-    */
+        In RoboElectric test we write
 
-    @Mock
-    Context context;
+        @RunWith(RobolectricTestRunner.class)
+        @Config(constants = BuildConfig.class, sdk = 21)
+        public class AppUtilsAndroidMock {
 
-    @Before
-    public void setUp() throws Exception {
-        //context = InstrumentationRegistry.getTargetContext();
-        //Assert.assertNotNull(context);
-    }
+            @Test
+            public void getLocationPermissionsStatus() throws Exception {
+                MainActivity mainActivity = Robolectric.setupActivity(MainActivity.class);
+                boolean expected = false;
+                boolean actual = AppUtils.getLocationPermissionsStatus(mainActivity);
+                Assert.assertEquals(expected, actual);
+            }
+        }
 
-    @Test
-    public void providesLocationRequest() throws Exception {
-        LocationRequest locationRequest = LocationApiInjector.providesLocationRequest();
-        Assert.assertNotNull(locationRequest);
-        Assert.assertEquals(LocationRequest.PRIORITY_HIGH_ACCURACY, locationRequest.getPriority());
-        Assert.assertEquals(Constants.LOCATION_UPDATE_INTERVAL_MS, locationRequest.getInterval());
-        Assert.assertEquals(Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS, locationRequest.getFastestInterval());
-        Assert.assertEquals(Constants.LOCATION_UPDATE_DISPLACEMENT_METERS, locationRequest.getSmallestDisplacement(), 10);
-    }
+        @Config(constants = BuildConfig.class, sdk = 21) this line configures the current class to run against android 5.0. For that it
+        has to run against android 5.0 shadow jar which contains all the shadow objects. So it downloads that jar from online as we can see from logs
 
-    @Test
-    public void providesCustomLocationRequest() throws Exception {
+        No such manifest file: build\intermediates\bundles\debug\AndroidManifest.xml
+        Downloading: org/robolectric/android-all/5.0.0_r2-robolectric-1/android-all-5.0.0_r2-robolectric-1.pom from repository sonatype at https://oss.sonatype.org/content/groups/public/
+        Transferring 1K from sonatype
+        Downloading: org/robolectric/android-all/5.0.0_r2-robolectric-1/android-all-5.0.0_r2-robolectric-1.jar from repository sonatype at https://oss.sonatype.org/content/groups/public/
+        Transferring 41864K from sonatype
 
-        LocationRequest locationRequest = LocationApiInjector.providesCustomLocationRequest(LocationRequest.PRIORITY_HIGH_ACCURACY,
-                Constants.LOCATION_UPDATE_INTERVAL_MS,
-                Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS,
-                Constants.LOCATION_UPDATE_DISPLACEMENT_METERS);
-        Assert.assertNotNull(locationRequest);
-        Assert.assertEquals(LocationRequest.PRIORITY_HIGH_ACCURACY, locationRequest.getPriority());
-        Assert.assertEquals(Constants.LOCATION_UPDATE_INTERVAL_MS, locationRequest.getInterval());
-        Assert.assertEquals(Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS, locationRequest.getFastestInterval());
-        Assert.assertEquals(Constants.LOCATION_UPDATE_DISPLACEMENT_METERS, locationRequest.getSmallestDisplacement(), 10);
 
-    }
+        We tested the checkLocationPermission method using Mockito and Robolectric using below code
 
-    @Test
-    public void providesLocationSettingsRequest() throws Exception {
-        LocationSettingsRequest locationSettingsRequest = LocationApiInjector.providesLocationSettingsRequest();
-        Assert.assertNotNull(locationSettingsRequest);
-    }
+        @RunWith(RobolectricTestRunner.class)
+        @Config(constants = BuildConfig.class, sdk = 19)
+        public class AppUtilsAndroidMock {
 
-    @Test
-    public void provideCustomLocationSettingsRequest() throws Exception {
-        LocationSettingsRequest locationSettingsRequest = LocationApiInjector.provideCustomLocationSettingsRequest(LocationApiInjector.providesLocationRequest());
-        Assert.assertNotNull(locationSettingsRequest);
-    }
+            @Mock
+            Context context;
 
-    @Test
-    public void providesFusedLocationClient() throws Exception {
-        FusedLocationProviderClient fusedLocationProviderClient = LocationApiInjector.providesFusedLocationClient(context);
-        Assert.assertNotNull(fusedLocationProviderClient);
-     }
+            @Test
+            public void getLocationPermissionsStatus() throws Exception {
+                boolean expected = true;
+                boolean actual = AppUtils.getLocationPermissionsStatus(context);
+                Assert.assertEquals(expected, actual);
+            }
 
-    @Test
-    public void providesSettingsClient() throws Exception {
-        SettingsClient settingsClient = LocationApiInjector.providesSettingsClient(context);
-        Assert.assertNotNull(settingsClient);
-    }
+            @Before
+            public void setUp() throws Exception {
+                MockitoAnnotations.initMocks(this);
 
-}
+            }
+        }
+
+
+        The results were not satisfying as it gave wrong results. It might be due to some other settings inside which might have resulted default value/null
+        which might have lead to wrong result. One more thing is that this method actually checks for location permission. So we should actually
+        test this using actual device by turning on and off the location permission.
+
+        There is one more method which we tried which actually gave the correct results. The above code wrong results because we had mocked the context using mockito
+        and tried using robolectric which is not correct. Robolectric has class and method to provide context
+
+                Context context = RuntimeEnvironment.application.getApplicationContext();
+
+        By using this we got the correct results.
+
+        We can avoid downloading the manifest everytime by configuring and specifying those things in robolectric.properties file.
+
+        Android Annotations
+        Annotations are very useful in verifying the code at build time. For example consider the following code
+
+        public static FragmentTransaction addFragmentToActivity (FragmentManager fragmentManager,
+                                               Fragment fragment, int frameId) {
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.add(frameId, fragment);
+            transaction.commit();
+
+            return transaction;
+        }
+
+        In the above code we are passing some parameters and returning some values. But we are not checking whether it is null or not.
+        This might result in crashes and unexpected behaviours. We are also returning values which might be null. Referencing them will create crashes.
+
+        We are passing in an Id. It should actually be a resource id. Since it takes an int, passing any int will call that method but eventually crashes it.
+
+        So we need to have build checks so that there will not be any breaks. We will use the following annotations to make sure that everything is correct.
+
+        @Nonnull, @Nullable - The @Nullable annotation indicates a variable, parameter, or return value that can be null while @NonNull indicates a variable, parameter, or return value that cannot be null.
+
+        @IdRes -  Annotations that check that a ressource parameter is of kind R.id.
+
+        @StringRes - Annotations that check that a resource parameter contains an R.string reference
+
+        There are lot of useful annotations that can be used frequently.
+
+        - @DrawableRes, @DimenRes, @ColorRes, @InterpolatorRes
+        - @MainThread, @UiThread, @WorkerThread, @BinderThread, @AnyThread
+        - @IntRange, @FloatRange, @Size
+        - @IntDef and @StringDef
+        - @CheckResult annotation to validate that a method's result or return value is actually used. Instead of annotating every non-void method with @CheckResult, add the annotation to clarify the results of potentially confusing methods.
+                For example, new Java developers often mistakenly think that <String>.trim() removes whitespace from the original string. Annotating the method with @CheckResult flags uses of <String>.trim() where the caller does not do anything with the method's return value.
+                Denotes that the annotated method returns a result that it typically is an error to ignore. This is usually used for methods that have no side effect, so calling it without actually looking at the result usually means the developer has misunderstood what the method does.
+                public @CheckResult String trim(String s) { return s.trim(); }
+                    ...
+                    s.trim(); // this is probably an error
+                    s = s.trim(); // ok
+
+        Build Flavors
+        In our application we are creating different versions of the application or we can say different build types. There is actually difference between build types
+        and product flavors. To understand let's see this StackOverflow post:
+
+            Some concrete examples that led to my confusion:
+            The signingConfig property can be set in both build types and product flavors... but minifyEnabled (and, I assume, shrinkResources?) can only be configured in build types.
+            applicationId can only be specified in product flavors... and applicationIdSuffix can only be specified in build types!?
+
+            Explanation: build types are for different builds of your application that aren't functionally different -- if you have a debug and release version of your app, they're the same app, but one contains debugging code, maybe more logging, etc., and the other is streamlined and optimized and possibly obfuscated via ProGuard.
+            With flavors, the intent is that the app is notably different in some way. The clearest example would be a free vs. a paid version of your app, but developers may also differentiate based on where it's being distributed (which could affect in-app billing API use).
+
+            Sometimes it so happens that you are developing a free and a paid version of the app. Free version uses different API Key and Paid version ues different API Key and that is the only difference. Before generating the apk you make sure that correct key goes into correct apk.
+            This means to have different build types because it is the just the same app with different credentials or an apk with or without progaurd enables. For Progaurd you can see in the build.gradle file.
+
+            buildTypes {
+                debug {
+                    minifyEnabled false
+                    proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+                }
+                release {
+                    minifyEnabled true
+                    proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+                }
+            }
+
+            buildType configure how we package our app
+
+            - shrinkResources
+            - progaurdFile
+
+            Flavor configure different classes and resources.
+
+            - in Flavor1 your MainActivity can do something, and in Flavor2 different implementation
+            - differente App name
+
+            Basically Flavors change your app completely. Suppose for example you want to test the app which involves network calls. You can't do network calls in unit testing.
+            So you decide to use dummy response data and test how the things work. Here we are changing how the app is working and on what it is working. We can create new files
+            that are responsible for generating this dummy data but keeping them in the same src folder creates confusion and it is bad style of coding. So we create different flavors
+            which contain different files. 1 flavor contains files that fetch real data from server and another flavor the fetches dummy data. Creation is simple
+
+                productFlavors {
+                    mock {
+                        applicationIdSuffix = ".mock"
+                    }
+                    prod {
+
+                    }
+                }
+
+            As we can see, the name of one flavor is prod which relates production version of the app and another version is mock which relates data mocked version of the app.
+
+            There will be a defaultconfig for android
+
+            defaultConfig {
+                applicationId "com.napps.nearbycoffee"
+                minSdkVersion 15
+                targetSdkVersion 25
+                versionCode 1
+                versionName "1.0"
+                testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+            }
+
+            This configuration can be distributed over different flavors like below
+
+            productFlavors {
+                    blueberry {
+                        minSdkVersion 21
+                        applicationId 'com.sample.foo.blueberry'
+                        targetSdkVersion 23
+                        versionCode 1
+                        versionName '1.0'
+                    }
+                    chocolate {
+                        minSdkVersion 19
+                        applicationId 'com.sample.foo.chocolate'
+                        targetSdkVersion 24
+                        versionCode 1
+                        versionName '1.0'
+                    }
+                    raspberry {
+                        minSdkVersion 19
+                        applicationId 'com.sample.foo.multipleflavorsample.raspberry'
+                        targetSdkVersion 23
+                        versionCode 1
+                        versionName '1.0'
+                    }
+            }
+            Note: We have changed the applicationID, so all three flavors can exist on the same device at the same time, as well as modified the minimum and target SDK versions.
+
+            A build type applies settings relating to the build and packaging of the app, such as if it’s debuggable and the signing keys. The default build types are debug and release.
+            In contrast, a flavor can specify features, device and API requirements (such as custom code, layout and drawables), and minimum and target API levels among others. The combination of build types and flavors forms a “Build Variant”. There is a build variant for every defined flavor/build type combination.
+
+            Adding and Editing Build Flavors can also be done in Studio using Build -> Edit BuildTypes or Build -> Edit Flavors
+
+            Best Example for two different flavors would be phone and tablet
+
+            productFlavors {
+                phone {
+                    applicationId
+                    "com.ebookfrenzy.buildexample.app.phone"
+                    versionName "1.0-phone"
+                }
+                tablet {
+                    applicationId
+                    "com.ebookfrenzy.buildexample.app.tablet"
+                    versionName "1.0-tablet"
+                }
+           }
+
+
+          Different product flavors might have same classes with different implementations. But in android it will not allow you to create same class twice.
+          Here's the thing. There will be different folders and you can see them if you switch to project view
+
+            F:\Github Repo\android-architecture\android-architecture\todoapp\app\src\androidTest
+            F:\Github Repo\android-architecture\android-architecture\todoapp\app\src\androidTestMock
+            F:\Github Repo\android-architecture\android-architecture\todoapp\app\src\main
+            F:\Github Repo\android-architecture\android-architecture\todoapp\app\src\mock
+            F:\Github Repo\android-architecture\android-architecture\todoapp\app\src\prod
+            F:\Github Repo\android-architecture\android-architecture\todoapp\app\src\test
+
+            Here we can see that there are two folders mock and prod and also main. Main folder is the main application folder and you cannot create alternative for that.
+            If there is a class in main folder, you can't create a duplicate class in either main or any other folder. This becomes confusing then how to create same class file
+            twice having different implementations. The idea is to separate the classes which might have different flavors from the main folder. Main folder is like holding the
+            common classes across different product flavors. So first separate those files. After separating those files you can create two different versions of the class - one in prod
+            and one in mock. While building android picks up the corresponding file from the corresponding folder based on the build variant.
+             
+            @Mock
+            Context context;
+
+            @Before
+            public void setUp() throws Exception {
+                //context = InstrumentationRegistry.getTargetContext();
+                //Assert.assertNotNull(context);
+            }
+
+            @Test
+            public void providesLocationRequest() throws Exception {
+                LocationRequest locationRequest = LocationApiInjector.providesLocationRequest();
+                Assert.assertNotNull(locationRequest);
+                Assert.assertEquals(LocationRequest.PRIORITY_HIGH_ACCURACY, locationRequest.getPriority());
+                Assert.assertEquals(Constants.LOCATION_UPDATE_INTERVAL_MS, locationRequest.getInterval());
+                Assert.assertEquals(Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS, locationRequest.getFastestInterval());
+                Assert.assertEquals(Constants.LOCATION_UPDATE_DISPLACEMENT_METERS, locationRequest.getSmallestDisplacement(), 10);
+            }
+
+            @Test
+            public void providesCustomLocationRequest() throws Exception {
+
+                LocationRequest locationRequest = LocationApiInjector.providesCustomLocationRequest(LocationRequest.PRIORITY_HIGH_ACCURACY,
+                        Constants.LOCATION_UPDATE_INTERVAL_MS,
+                        Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS,
+                        Constants.LOCATION_UPDATE_DISPLACEMENT_METERS);
+                Assert.assertNotNull(locationRequest);
+                Assert.assertEquals(LocationRequest.PRIORITY_HIGH_ACCURACY, locationRequest.getPriority());
+                Assert.assertEquals(Constants.LOCATION_UPDATE_INTERVAL_MS, locationRequest.getInterval());
+                Assert.assertEquals(Constants.LOCATION_UPDATE_FASTEST_INTERVAL_MS, locationRequest.getFastestInterval());
+                Assert.assertEquals(Constants.LOCATION_UPDATE_DISPLACEMENT_METERS, locationRequest.getSmallestDisplacement(), 10);
+
+            }
+
+            @Test
+            public void providesLocationSettingsRequest() throws Exception {
+                LocationSettingsRequest locationSettingsRequest = LocationApiInjector.providesLocationSettingsRequest();
+                Assert.assertNotNull(locationSettingsRequest);
+            }
+
+            @Test
+            public void provideCustomLocationSettingsRequest() throws Exception {
+                LocationSettingsRequest locationSettingsRequest = LocationApiInjector.provideCustomLocationSettingsRequest(LocationApiInjector.providesLocationRequest());
+                Assert.assertNotNull(locationSettingsRequest);
+            }
+
+            @Test
+            public void providesFusedLocationClient() throws Exception {
+                FusedLocationProviderClient fusedLocationProviderClient = LocationApiInjector.providesFusedLocationClient(context);
+                Assert.assertNotNull(fusedLocationProviderClient);
+             }
+
+            @Test
+            public void providesSettingsClient() throws Exception {
+                SettingsClient settingsClient = LocationApiInjector.providesSettingsClient(context);
+                Assert.assertNotNull(settingsClient);
+            }
+
+        }
