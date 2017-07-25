@@ -826,7 +826,57 @@ public class LocationApiInjectorTest {
             twice having different implementations. The idea is to separate the classes which might have different flavors from the main folder. Main folder is like holding the
             common classes across different product flavors. So first separate those files. After separating those files you can create two different versions of the class - one in prod
             and one in mock. While building android picks up the corresponding file from the corresponding folder based on the build variant.
-             
+
+
+            There was a scenario in nearbycoffeeshops app. There was coffeeshopsrepository and coffeeshopsremoterepository. There was a repositoryInjector which injected the repositories.
+            We had something like this
+
+            public final class RepositoryInjector {
+
+                public static final CoffeeShopsRemoteRepository providesCoffeeShopsRemoteRepository(){
+                    return new CoffeeShopsRemoteRepository();
+                }
+            }
+
+            But this is not following the proper MVP architecture. When asked for repository, we should always provide CoffeeShopsRepository. Inside Coffeeshopsrepository we had something like this
+
+            public class CoffeeShopsRepository implements CoffeeShopsDataSource {
+
+                    private static CoffeeShopsRepository sInstance = null;
+
+                    private CoffeeShopsRemoteRepository coffeeShopsRemoteRepository;
+            ...
+            ...
+
+            where we are having a specific "CoffeeShopsRemoteRepository" but that should not be the case. A repository should communicate with a "Data Source" be it either - remote or local
+            So we will change the instance to coffeedatasource.
+
+            public class CoffeeShopsRepository implements CoffeeShopsDataSource {
+
+                private static CoffeeShopsRepository sInstance = null;
+
+                private CoffeeShopsDataSource coffeeShopsRemoteRepository;
+
+                private CoffeeShopsRepository(@NonNull CoffeeShopsDataSource coffeeShopsDataSource){
+                    this.coffeeShopsRemoteRepository = coffeeShopsDataSource;
+                }
+
+                public static CoffeeShopsRepository getsInstance(@NonNull CoffeeShopsDataSource coffeeShopsDataSource){
+                    if(sInstance == null){
+                        sInstance = new CoffeeShopsRepository(coffeeShopsDataSource);
+                }
+
+                return sInstance;
+            }
+
+            Now It's fine if we just provide CoffeeShopsDataSource instance. Be it is implemented by CoffeeShopsRemoteRepository, CoffeeShopsLocalRepository, FakeCoffeeShopsRepository doesn't matter.
+            Now we can create fake one and pass it without having to change the implementation. This we call it clean testable architecture.
+
+            Now coffeeshopsremoterepository and fakecoffeeshopsremoterepository can have completely different implementations. One can be singleton and other may not be. They just have to implement the methods
+            of CoffeeDataSource. Later in the project we can add one more type of repository like Coffeeshopscacherepository which is also a valid repository and accepted by
+            CoffeeShopsRepository because it doesn't care which class it is, it just wants a datasource and Coffeeshopscacherepository. This we call clean maintainable architecture.
+            Here we are satisfying two SOLID principles - Single Responsbility and Interface Seggregation.
+
             @Mock
             Context context;
 
