@@ -182,6 +182,7 @@ public class LocationApiInjectorTest {
 
     A basic JUnit 4 test class is a Java class that contains one or more test methods. A test method begins with the @Test annotation and contains the code to exercise and verify a single functionality (that is, a logical unit) in the component that you want to test.
 
+
     The following snippet shows an example JUnit 4 integration test that uses the Espresso APIs to perform a click action on a UI element, then checks to see if an expected string is displayed.
 
     @RunWith(AndroidJUnit4.class)
@@ -876,6 +877,273 @@ public class LocationApiInjectorTest {
             of CoffeeDataSource. Later in the project we can add one more type of repository like Coffeeshopscacherepository which is also a valid repository and accepted by
             CoffeeShopsRepository because it doesn't care which class it is, it just wants a datasource and Coffeeshopscacherepository. This we call clean maintainable architecture.
             Here we are satisfying two SOLID principles - Single Responsbility and Interface Seggregation.
+
+            Now Android View contains four folders if the build variant is mockDebug/mockRelease
+
+            nearbycoffee
+            nearbycoffee(androidTest)
+            nearbycoffee (test)
+            nearbycoffee\Injectors (mock)
+
+            If the build variant is prodDebug/prodRelease, then
+
+            nearbycoffee
+            nearbycoffee(androidTest)
+            nearbycoffee (test)
+            nearbycoffee\Injectors (prod)
+
+            As we can see the last folder acts as a detachable folder which contains flavor specific files. At any point of time we will be either in prod/mock.
+            Prod version is kind of separate project and mock version is kind of separate project. When in particular version, all classes used in that flavor should be present
+            and each flavor is built as a single independent project.
+            Having this kind of environment is called Hermetic Environment
+
+            Coming back to Testing, Sometimes we have to test callbacks. Testing callbacks is not an easy job. We call a method and pass a callback. There might be different methods
+            of callback that can be called. We can't verify each and every method. It becomes like we are creating a whole new callback and implementing those methods.
+            Sometimes we have to test methods that use callbacks, meaning that they are asynchronous by definition.
+            These methods are not easy to test and using Thread.sleep(milliseconds) method to wait for the response is not a good practice and can convert your tests in non-deterministic ones
+
+            There are basically two types of callbacks - synchronous and asynchronous callbacks
+
+            Synchronous callbacks run on the same thread and provide immediate callbacks. Let's see the way of testing it.
+            These callbacks are tested by creating a mock objects and using Mockito's doAnswer.
+
+            Consider the following method to be tested:
+            public void getCoffeeShops(final CoffeeShopsReceiver coffeeShopsReceiver, double latitude, double longitude, int radius)
+
+            It takes in callback CoffeeShopsReceiver. Once the method has finished computation, it either calls onCoffeeShopsReceived(..) to post results
+            or OnNetworkError(..) to post error. We know that we are gonna receive callback in either of the two methods. So we have to mock those two methods. Let's see how can we mock
+            OnCoffeeShopsReceived method
+
+            doAnswer(receive something using answer instance).when(Callback.class).callbackmethod(..);
+
+                final List<Result> results = new ArrayList<>();
+                Mockito.doAnswer(new Answer() {
+                    @Override
+                    public Object answer(InvocationOnMock invocation) throws Throwable {
+                        List<Result> mockedResult = invocation.getArgument(0);
+                        Assert.assertEquals(results, mockedResult);
+                        return null;
+                    }
+                }).when(coffeeShopsReceiver).OnCoffeeShopsReceived(results);
+
+
+            Similarly for OnNetworkError(..)
+
+                final String message = "something happened";
+                Mockito.doAnswer(new Answer() {
+                    @Override
+                    public Object answer(InvocationOnMock invocation) throws Throwable {
+                        String messageReceived = invocation.getArgument(0);
+                        Assert.assertEquals(message, messageReceived);
+                        return null;
+                    }
+                }).when(coffeeShopsReceiver).OnNetworkError(message);
+
+            Let's test the method by calling the following method
+            coffeeShopsRemoteRepository.getCoffeeShops(coffeeShopsReceiver, -1, -1, 10);
+
+            After running we got the following error. The error is as shown below
+
+            java.lang.IllegalArgumentException: Unable to create call adapter for io.reactivex.Observable<com.napps.nearbycoffee.Model.PlaceSearchResponse>
+            for method PlacesAPIService.getNearbyCoffeeShops
+
+            It is due to the wrong usage of rx-java adapter. We have to observer one thing here. We got to know that we are using wrong rx-java adapter library
+            by running a unit test. If not this would have resulted in crash and it would have taken more time running and debugging in the actual device.
+
+
+            Some insights about Junit
+
+            JUnit Lifecycle, continued
+            Lifecycle stage	Method called	Method description
+
+            Setup
+            public void setUp()
+            Called to do any required preprocessing before a test. Examples include instantiating
+
+            Test
+            public void testXYZ()
+            Each test method is called once within the test lifecycle. It performs all required testing. Test results are recorded by JUnit for reporting to the test runner upon completion.
+
+            Teardown
+            public void tearDown()
+            Called to do any required post processing after a test. Examples include cleaning up of database tables and closing database connections.
+
+
+            Assertions
+            Assertion	                            What it does
+            assertNull(Object x)	                Validates that the parameter is null
+            assertNotNull(Object x)	                Validates that the parameter is not null
+            assertTrue(boolean x)	                Validates that the parameter is true
+            assertFalse(boolean x)	                Validates that the parameter is false
+            assertEquals(Object x, Object y)	    Validates that the two objects passed are equal based on the .equals(Object obj1, Object obj2) method
+            assertSame(Object x, Object y)	        Validates that the two objects passed are equal based on the == operator
+            assertNotSame(Object x, Object y)	    Validates that the two objects passed are not equal based on the == operator
+            fail()	                                Programmatically fail the test.
+
+
+            Annotation	        Parameters	        Use
+            @After	            None	            Method will be executed after each test method (similar to the tearDown() method in JUnit 3.x). Multiple methods may be tagged with the @After annotation, however no order is guaranteed.
+            @AfterClass	        None	            Method will be executed after all of the test methods and teardown methods have been executed within the class. Multiple methods may be tagged with the @AfterClass annotation, however no order is guaranteed.
+            @Before	            None	            Method will be executed before each test method (similar to the setUp() method in JUnit 3.x). Multiple methods may be tagged with the @Before annotation, however no order is guaranteed.
+            @BeforeClass	    None	            Executed before any other methods are executed within the class. Multiple methods may be tagged with the @BeforeClass annotation, however no order is guaranteed.
+            @Ignore	            String (optional)	Used to temporarily exclude a test method from test execution. Accepts an optional String reason parameter.
+            @Parameters	        None	            Indicates a method that will return a Collection of objects that match the parameters for an available constructor in your test. This is used for parameter driven tests.
+            @RunWith	        Class	            Used to tell JUnit the class to use as the test runner. The parameter must implement the interface junit.runner.Runner.
+            @SuiteClasses	    Class []	        Tells JUnit a collection of classes to run. Used with the @RunWith(Suite.class) annotation is used.
+            @Test	            Class(optional)     Used to indicate a test method. Same functionality as naming a method public void testXYZ() in JUnit 3.x. The class parameter is used to indicate an exception is expected to be thrown and what the exception is. The timeout parameter specifies in milliseconds how long to allow a single test to run. If the test takes longer than the timeout, it will be considered a failure.
+
+            Sometimes it happens that you are testing an interface like Map<K,V> . You mock the object and it is created but there is no implementation of the method. So you want to assign an instance of object that implements this interface to test the methods
+            like HashMap<K, V>.
+
+            a Similar kind of example is given below
+            @RunWith(MockitoJUnitRunner.class)
+            public class BackgroundExecutorServiceTest {
+
+                BackgroundExecutorContract<PlaceSearchResponse, Throwable> backgroundExecutorContract;
+
+                @Test
+                public void executeSingleTask() throws Exception {
+                    backgroundExecutorContract = Mockito.mock(BackgroundExecutorService.class);
+                }
+
+            }
+
+            BackgroundExecutorContract is the interface, BackgroundExecutorService is the class implementing it.
+
+            How to test RxJava and Retrofit
+
+                            1. Get rid of the static call - use dependency injection
+
+                            The first problem in your code is that you use static methods. This is not a testable architecture, at least not easily, because it makes it harder to mock the implementation. To do things properly, instead of using Api that accesses ApiClient.getService(), inject this service to the presenter through the constructor:
+
+                            public class SplashPresenterImpl implements SplashPresenter {
+
+                            private SplashView splashView;
+                            private final ApiService service;
+
+                            public SplashPresenterImpl(SplashView splashView, ApiService service) {
+                                this.splashView = splashView;
+                                this.apiService = service;
+                            }
+                            2. Create the test class
+
+                            Implement your JUnit test class and initialize the presenter with mock dependencies in the @Before method:
+
+                            public class SplashPresenterImplTest {
+
+                            @Mock
+                            ApiService apiService;
+
+                            @Mock
+                            SplashView splashView;
+
+                            private SplashPresenter splashPresenter;
+
+                            @Before
+                            public void setUp() throws Exception {
+                                this.splashPresenter = new SplashPresenter(splashView, apiService);
+                            }
+                            3. Mock and test
+
+                            Then comes the actual mocking and testing, for example:
+
+                            @Test
+                            public void testEmptyListResponse() throws Exception {
+                                // given
+                                when(apiService.syncGenres()).thenReturn(Observable.just(Collections.emptyList());
+                                // when
+                                splashPresenter.syncGenres();
+                                // then
+                                verify(... // for example:, verify call to splashView.navigateToHome()
+                            }
+                            That way you can test your Observable + Subscription, if you want to test if the Observable behaves correctly, subscribe to it with an instance of TestSubscriber.
+
+                            Troubleshooting
+
+                            When testing with RxJava and RxAndroid schedulers, such as Schedulers.io() and AndroidSchedulers.mainThread() you might encounter several problems with running your observable/subscription tests.
+
+                            NullPointerException
+
+                            The first is NullPointerException thrown on the line that applies given scheduler, for example:
+
+                            .observeOn(AndroidSchedulers.mainThread()) // throws NPE
+                            The cause is that AndroidSchedulers.mainThread() is internally a LooperScheduler that uses android's Looper thread. This dependency is not available on JUnit test environment, and thus the call results in a NullPointerException.
+
+                            Race condition
+
+                            The second problem is that if applied scheduler uses a separate worker thread to execute observable, the race condition occurs between the thread that executes the @Test method and the said worker thread. Usually it results in test method returning before observable execution finishes.
+
+                            Solutions
+
+                            Both of the said problems can be easily solved by supplying test-compliant schedulers, and there are few options:
+
+                            Use RxJavaHooks and RxAndroidPlugins API to override any call to Schedulers.? and AndroidSchedulers.?, forcing the Observable to use, for example, Scheduler.immediate():
+
+
+                                    @Before
+                                    public void setUp() throws Exception {
+                                            // Override RxJava schedulers
+                                            RxJavaHooks.setOnIOScheduler(new Func1<Scheduler, Scheduler>() {
+                                                @Override
+                                                public Scheduler call(Scheduler scheduler) {
+                                                    return Schedulers.immediate();
+                                                }
+                                            });
+
+                                            RxJavaHooks.setOnComputationScheduler(new Func1<Scheduler, Scheduler>() {
+                                                @Override
+                                                public Scheduler call(Scheduler scheduler) {
+                                                    return Schedulers.immediate();
+                                                }
+                                            });
+
+                                            RxJavaHooks.setOnNewThreadScheduler(new Func1<Scheduler, Scheduler>() {
+                                                @Override
+                                                public Scheduler call(Scheduler scheduler) {
+                                                    return Schedulers.immediate();
+                                                }
+                                            });
+
+                                            // Override RxAndroid schedulers
+                                            final RxAndroidPlugins rxAndroidPlugins = RxAndroidPlugins.getInstance();
+                                            rxAndroidPlugins.registerSchedulersHook(new RxAndroidSchedulersHook() {
+                                                @Override
+                                                public Scheduler getMainThreadScheduler() {
+                                                    return Schedulers.immediate();
+                                            }
+                                        });
+                                    }
+
+                                    @After
+                                    public void tearDown() throws Exception {
+                                        RxJavaHooks.reset();
+                                        RxAndroidPlugins.getInstance().reset();
+                                    }
+
+                        This code has to wrap the Observable test, so it can be done within @Before and @After as shown, it can be put into JUnit @Rule or placed anywhere in the code. Just don't forget to reset the hooks.
+                        Second option is to provide explicit Scheduler instances to classes (Presenters, DAOs) through dependency injection, and again just use Schedulers.immediate() (or other suitable for testing).
+                        As pointed out by @aleien, you can also use an injected RxTransformer instance that executes Scheduler application.
+                        I've used the first method with good results in production.
+
+
+            In the NearByCoffee project, we decided to use retrofit and rxjava. For each retrofit call we get a Call<R> object. Rxjava provides a adapter which in turn returns an observable.
+
+            Normal Retrofit Interface
+                @GET(NEARBY_SEARCH_JSON)
+                Call<PlaceSearchResponse> getNearbyCoffeeShops(@QueryMap Map<String, String> queryParams);
+            Observable Retrofit Interface
+                @GET(NEARBY_SEARCH_JSON)
+                Observable<PlaceSearchResponse> getNearbyCoffeeShops(@QueryMap Map<String, String> queryParams);
+
+             Providing an observable is pretty good because in case if we want to do chaining requests, rxjava flatmap operations it comes handy.
+             But by directly coupling Retrofit calls to observable makes testing difficult. You can't individually  test RxJava and Retrofit.
+             RxJava also has some issues while doing instrumentation testing due to thread race conditions. So in case of Observable only way to test the api call
+             is to mock the observable and get the results in callback. Due to rxjava unit testing isssues it was difficult for us to test the calls directly.
+
+             So we had to decouple them. If we decouple and go back to original Call<R> style, we won't get the benefits of RxJava. So we had to intercept in between
+             to manually convert a Retorofit Call<R> instance to Observable<R> in a separate method using RxJava2CallAdapter. Here's the method.
+
+             
 
             @Mock
             Context context;
