@@ -1143,7 +1143,106 @@ public class LocationApiInjectorTest {
              So we had to decouple them. If we decouple and go back to original Call<R> style, we won't get the benefits of RxJava. So we had to intercept in between
              to manually convert a Retorofit Call<R> instance to Observable<R> in a separate method using RxJava2CallAdapter. Here's the method.
 
-             
+            public static <T> Observable<T> providesCallObservable(T responseType, Call<T> call, Class<?> annotations, Retrofit retrofit){
+                RxJava2CallAdapterFactory rxJava2CallAdapterFactory = RxJava2CallAdapterFactory.create();
+                CallAdapter<T, Observable> callAdapter = (CallAdapter<T, Observable>)rxJava2CallAdapterFactory.get(Observable.class, annotations.getAnnotations(), retrofit);
+                return callAdapter.adapt(call);
+            }
+
+            This is a generic method. Using type parameters to just restricting to a static method and without applying it to enclosing component is called generic method
+
+            Benefits of doing this.
+            1. Loose coupling - Once of the SOLID principles acheived
+            2. We can easily test the actual network calls directly using Call<R> service without depending on RxJava
+            3. We can RxJava only when required or else we can directly use Call<R> as this also uses efficient background threading to perform network operations
+            4. RxJava is dependent on Schedulers and since we are using AndroidSchedulers, we had to do it as an instrumentation test to get real instance of AndroidSchedulers. Now we
+                don't need to worry about mocking schedulers and all.
+            5. Network Operations are decoupled with
+
+            Testing a Callback which runs on a separate thread is quite impractical because test methods run in a new thread and this thread calls another method
+            which has callback which in turn runs on separate thread. Now the current thread doesn't wait for completion of another thread and this terminates immediately
+            which makes other thread difficult to communicate callback to the main thread.
+
+            Whenever you copy a normal test to different folders like(test/androidtest) it does not automatically turn into a unit test or a instrumentation test. Sometimes it happens
+            automatically and sometimes we have to do it on our own. So it is important to mention the test runner that you want to run with. Instrumentation test is also a test unless and until
+            you mention a runner which says it to run as an instrumentation test.
+
+            The test files under androidTest folder are by default run with androidInstrumentationRunner as specified in the gradle file
+
+                testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+            Importance of @serializedName annotation in model files.
+
+            It is very important because json parsing fails even though there is a character change in the parameter name.
+            Names play a very important role because serializing and deserializing works using reflection. It searches the parameter with that name
+            If the name is not present it will not parse. Once we have specified the parameter names, it is difficult to change them. To avoid all these
+            difficulties it is better to put annotations.
+
+            Unit testing has really been helpful. Many bugs were discovered with the help of unit testing
+            1. Google places base url correction
+            2. Some null pointer exception
+            3. Gson parsing error due to incorrect names
+            4. Got to know that status code is string and while comparing we have to compare
+
+
+            CallBack Testing
+            We wanted to test the following interface callback which also takes a callback
+
+                        void executeSingleTask(BackgroundNotifier<T, E> backgroundNotifier, Observable<T> observable, Scheduler scheduler);
+
+            Now this is implemented by some class and it returns suitable callback to backgroundNotifier. We want to test how the backgroundNotifier
+            behaves when different forms of result are passed i.e null, empty etc. Here our main testing component is backgroundNotifier. So we simulate the call
+            executeSingleTask and when it is called we will give callback results to backgroundNotifier like below
+
+                    Mockito.doAnswer(new Answer() {
+                        @Override
+                        public Object answer(InvocationOnMock invocation) throws Throwable {
+                            BackgroundExecutor.BackgroundNotifier backgroundNotifier = (BackgroundExecutor.BackgroundNotifier)invocation.getArguments()[0];
+                            Observable currentObservable = (Observable) invocation.getArguments()[1];
+                            backgroundNotifier.onTaskResponse(null);
+                            backgroundNotifier.onTaskResponse();
+                            return null;
+                        }
+                    }).when(backgroundExecutor).executeSingleTask(backgroundNotifier(argument 0), coffeeShopsObservable(argument 1), scheduler(argument 2));
+
+            We are not concerned with what executeSingleTask does but about the different types of callbacks that we receive, we are only concerned with callbacks
+            so we tested like the above.
+
+            Asynchronous callback testing:
+            We know the Junit tests run on a separate thread and if there is a asynchronous operation, it is difficult to test callbacks. There is workaround for this issue
+            using CountdownLatch. It is basically a countdowntimer that waits for predefined set of seconds before it shuts down. It basically makes current thread before shutdown
+            so that the callback is executed in that sufficient time. If callback is executed then our task is finished we inform the timer to shutdown.
+
+            Here's an example for it
+
+                        final CountDownLatch lock = new CountDownLatch(1);
+
+                        coffeeShopsCall.enqueue(new Callback<PlaceSearchResponse>() {
+
+                            @Override
+                            public void onResponse(Call<PlaceSearchResponse> call, Response<PlaceSearchResponse> response) {
+                                Assert.assertNotNull(response);
+                                Assert.assertTrue(response.isSuccessful());
+                                Assert.assertTrue(okStatus.equalsIgnoreCase(response.body().getStatus()));
+                                lock.countDown();
+
+                            }
+
+                            @Override
+                            public void onFailure(Call<PlaceSearchResponse> call, Throwable t) {
+                                Assert.assertNotNull(t);
+                                Assert.assertEquals(coffeeShopsCall, call);
+                                lock.countDown();
+                            }
+                        });
+
+                        lock.await(20000, TimeUnit.MILLISECONDS);
+
+            This simple example tests the asynchronous operations easily.
+
+
+
+
 
             @Mock
             Context context;
