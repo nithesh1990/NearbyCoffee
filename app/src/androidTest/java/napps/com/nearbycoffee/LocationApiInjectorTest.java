@@ -1242,7 +1242,56 @@ public class LocationApiInjectorTest {
 
 
 
+            The value of annotation that we pass should be compile time constant. If we do it the following way
 
+                String NEARBY_SEARCH_JSON = JavaUtils.buildUriPath(MAPS, API, PLACE, NEARBY_SEARCH, JSON);
+
+                @GET(NEARBY_SEARCH_JSON)
+                Call<PlaceSearchResponse> getNearbyCoffeeShops(@QueryMap Map<String, String> queryParams);
+
+            we get an error saying "Attribute value must be constant"
+
+            It is also not a good practice to provide annotations in variables because these might change. Specifying strings directly
+            is a good practice we can easily modify urls like switch from test server to real server. Putting it in a constant needs lot of modifications.
+
+            Consider the setting of baseUrl in the following format
+
+                            .baseUrl("https://"+Constants.GOOGLE_MAPS_API_BASE_URL)
+
+            Here Retrofit baseUrl is constructed using this way because if there is any error in url, we only get network error and it is handled by rxjava-retrofit
+            error handling scenarios. In case if there is any error in protocl like "htts"/"htps"/some error, reotrofit will throw an exception saying illegeal argument exception
+            Since the providesRetrofit is under dependency injection adding a throws creates a whole lot of code mess. So we make sure the https:// is present in url.
+            Incase if someone in future while changing the base url mistakenly changes it to htts, it won't crash using the above method. Similarly we have to make sure our method is
+            foolproof.
+
+            After changing this even though we put public static final String GOOGLE_MAPS_API_BASE_URL = "addjfhaufhuoaa" it is not crashing because it just gives a network error
+            saying could not find this.
+
+            Consider the below example
+
+            public class CoffeeShopsPresenterInstrumentationTest {
+                    @Mock
+                    CoffeeShopsViewContract.View view;
+
+
+                    @Mock
+                    List<Place> places;
+                    @Test
+                    public void getCoffeeShops() throws Exception {
+
+
+                        CoffeeShopsPresenter coffeeShopsPresenter = new CoffeeShopsPresenter(view);
+                        Assert.assertNotNull(coffeeShopsPresenter);
+                        coffeeShopsPresenter.getCoffeeShops(33.421779, -111.919611);
+                        Mockito.verify(view, Mockito.times(1)).showShopsList(places);
+                        Mockito.verify(view, Mockito.times(1)).showClientInternalError();
+                        Mockito.verify(view, Mockito.times(1)).showNetworkError();
+                        Mockito.verify(view, Mockito.times(1)).showNoShops();
+                    }
+            }
+
+            Even though we mocked the object view, it was null. It looks fine. We were actually running this test as an instrumentation test so it ran using
+            android instrumentation runner. The android instrumentation runner cannot mock the objects. So we need to invoke mockito annotations separately to mock objects
 
             @Mock
             Context context;
